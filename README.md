@@ -63,7 +63,7 @@ Key features across the scripts:
 
 ### Run the bot:
 ```bash
-python telegram_poll_bot.py
+python meeting_poll.py
 ```
 
 The bot will:
