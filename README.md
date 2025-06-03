@@ -1,15 +1,24 @@
-# Telegram Poll Bot
+# Various Telegram Scripts
+This repository contains a collection of Telegram bots and scripts for managing group meetings and schedules:
 
-A Telegram bot that automatically sends weekly polls to check attendance for upcoming meetings. The bot sends polls every week, reminds participants to vote, and closes the poll after 48 hours.
+- **Telegram Poll Bot**: Sends automated weekly polls to track meeting attendance, with configurable reminders and settings
+- **Weekly Overview Bot**: Provides a weekly summary of upcoming events and activities (implementation details not shown in codebase)
+- **Free Dates Bot**: Checks a CalDAV calendar and reports available dates in the next 2 weeks, with localized weekday names
 
-## Features
+The scripts use:
+- python-telegram-bot for Telegram integration
+- caldav for calendar access
+- Structured logging with rotating log files
+- Environment variables for configuration
+- Customizable message templates
+- Support for testing and production environments
 
-- Automatically sends weekly polls for meeting attendance
-- Sends reminders if not enough people have voted
-- Closes polls after 48 hours
-- Tracks unique voters
-- Configurable intervals for testing and production
-- Customizable poll messages and settings
+Key features across the scripts:
+- Robust error handling and logging
+- Timezone awareness
+- Configurable timing intervals
+- Localization support
+- Clean separation of configuration and logic
 
 ## Setup
 
@@ -29,7 +38,7 @@ A Telegram bot that automatically sends weekly polls to check attendance for upc
    ```
 5. Set up your environment variables in `.env`:
    - `TELEGRAM_BOT_TOKEN`: Your Telegram bot token from [@BotFather](https://t.me/botfather)
-   - `TELEGRAM_CHAT_ID`: The chat ID where the bot will send polls. To get a list of Chat IDs, visit: https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getUpdates
+   - `TELEGRAM_CHAT_ID`: The chat ID where the bot will send polls. To get a list of Chat IDs, visit: `https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getUpdates`.
 
 6. Copy `utils/templates-example.py` to `utils/templates.py`:
    ```bash
@@ -48,6 +57,7 @@ A Telegram bot that automatically sends weekly polls to check attendance for upc
    - `FREE_DAYS_HEADER`: Text Header which is added to the free days message. You can include "{} - {}", which will be filled with the start and end date of the interval.
    - `WEEKLY_OVERVIEW_HEADER`: Same behaviour as `FREE_DAYS_HEADER`.
 
+8. Set up cronjobs to run either of the scripts on a regular basis.
 
 ## Usage
 
