@@ -1,9 +1,9 @@
 # Various Telegram Scripts
 This repository contains a collection of Telegram bots and scripts for managing group meetings and schedules:
 
-- **Telegram Poll Bot**: Sends automated weekly polls to track meeting attendance, with configurable reminders and settings
-- **Weekly Overview Bot**: Provides a weekly summary of upcoming events and activities (implementation details not shown in codebase)
-- **Free Dates Bot**: Checks a CalDAV calendar and reports available dates in the next 2 weeks, with localized weekday names
+- **Telegram Poll Bot**: Sends automated weekly polls to track meeting attendance, with configurable reminders and settings.
+- **Weekly Overview Bot**: Provides a weekly summary of upcoming events and activities.
+- **Free Dates Bot**: Checks a CalDAV calendar and reports available dates in the next 2 weeks, with localized weekday names.
 
 The scripts use:
 - python-telegram-bot for Telegram integration
