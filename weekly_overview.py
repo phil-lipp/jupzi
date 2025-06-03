@@ -62,8 +62,8 @@ def generate_week_overview() -> str:
         formatted_events.sort(key=lambda x: x[0])
 
         # Create the message
-        week_from = monday.strftime("%d.%m")
-        week_to = next_sunday.strftime("%d.%m")
+        week_from = monday.strftime("%d.%m.")
+        week_to = next_sunday.strftime("%d.%m.")
         message = WEEKLY_OVERVIEW_HEADER.format(
             start_date=week_from,
             end_date=week_to
