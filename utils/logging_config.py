@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Common logging format
-LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - [%(environment)s] - %(message)s'
 
 # Ensure logs directory exists
 LOGS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
@@ -34,6 +34,14 @@ def setup_logging(log_file: str) -> logging.Logger:
     # Create formatters
     formatter = logging.Formatter(LOG_FORMAT)
     
+    # Add environment info to log records
+    old_factory = logging.getLogRecordFactory()
+    def record_factory(*args, **kwargs):
+        record = old_factory(*args, **kwargs)
+        record.environment = "TEST" if TESTING_ENVIRONMENT else "PROD"
+        return record
+    logging.setLogRecordFactory(record_factory)
+    
     # Create handlers
     log_path = os.path.join(LOGS_DIR, log_file)
     file_handler = logging.FileHandler(log_path)
@@ -50,7 +58,7 @@ def setup_logging(log_file: str) -> logging.Logger:
 
 
 # Testing environment
-TESTING_ENVIRONMENT = os.getenv('TESTING_ENVIRONMENT', True) # Default to True if not specified
+TESTING_ENVIRONMENT = os.getenv('TESTING_ENVIRONMENT', 'False').lower() == 'true'  # Convert string to boolean
 
 # Telegram configuration
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
