@@ -6,20 +6,26 @@ A calendar and meeting management system.
 
 ```
 jupzi/
-├── app/                    # Main application package
-│   ├── api/               # API endpoints and routes
-│   ├── core/              # Core application logic
-│   ├── models/            # Database models
-│   ├── utils/             # Utility functions
-│   ├── alembic/           # Database migrations
-│   └── database/          # Database configuration
-├── config/                # Configuration files
-│   ├── .env-example      # Example environment variables
-│   └── alembic.ini       # Alembic configuration
-├── scripts/               # Utility scripts
-│   ├── weekly_overview.py
-│   ├── meeting_poll.py
-│   └── free_dates.py
+├── app/
+│   ├── core/
+│   │   ├── bot/
+│   │   │   ├── bot.py           # Main bot class
+│   │   │   ├── handlers.py      # Message handlers
+│   │   │   └── commands.py      # Command implementations
+│   │   ├── scheduler/
+│   │   │   ├── scheduler.py     # Job scheduler
+│   │   │   └── jobs.py         # Job implementations
+│   │   └── persistence/
+│   │       ├── state.py        # State management
+│   │       └── storage.py      # Storage interface
+│   ├── models/                  # Database models (already OOP)
+│   ├── services/
+│   │   ├── calendar.py         # Calendar service
+│   │   ├── telegram.py         # Telegram service
+│   │   └── poll.py            # Poll service
+│   └── utils/
+│       ├── config.py           # Configuration management
+│       └── logging.py          # Logging utilities
 ├── logs/                  # Application logs
 ├── requirements.txt       # Python dependencies
 ├── Dockerfile            # Docker configuration

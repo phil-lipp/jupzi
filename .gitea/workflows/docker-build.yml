@@ -75,15 +75,6 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Load .env file
-        uses: hashicorp/vault-action@v2
-        with:
-          path: .env
-          url: ${{ secrets.VAULT_URL }}
-          method: approle
-          role-id: ${{ secrets.VAULT_ROLE_ID }}
-          secret-id: ${{ secrets.VAULT_SECRET_ID }}
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
