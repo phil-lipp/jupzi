@@ -1,0 +1,28 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# General Rules
+
+## Git Workflow
+- Always follow the commit message format specified in `.commit`
+- Create new branches for features, bug fixes, and significant changes
+- Keep branches short-lived and regularly sync with main
+- Use pull requests for code review
+- Delete branches after merging
+- Never commit sensitive information or credentials
+
+## Code Organization
+- Always update upstream and downstream files when making changes that impact them
+- Keep requirements.txt, README.md, .gitignore, and .env-example up to date
+- Use .gitignore to prevent sensitive or identifying information from leaking
+- Never mention "jupibar" in the code or documentation
+
+## Development Process
+- Write clear and descriptive commit messages
+- Review code changes before committing
+- Test changes locally before pushing
+- Keep the codebase clean and well-documented
+- Follow the established coding style and conventions
+

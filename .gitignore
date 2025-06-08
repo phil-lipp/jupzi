@@ -100,4 +100,4 @@ yarn.lock
 .DS_Store
 Thumbs.db
 
-.commit
+commit.ps1
