@@ -137,9 +137,9 @@ jobs:
           
           echo "=== Testing DNS Resolution ==="
           echo "Testing registry host resolution:"
-          echo "Using host command:"
+          echo "Using host command: host "$REGISTRY_HOST""
           host "$REGISTRY_HOST"
-          echo "Using dig command:"
+          echo "Using dig command: dig "$REGISTRY_HOST""
           dig "$REGISTRY_HOST"
           echo "Using nslookup command:"
           nslookup "$REGISTRY_HOST"
@@ -192,6 +192,15 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha,format=short
+
+      - name: Validate Docker image variables
+        run: |
+          if [ -z "${{ secrets.REGISTRY_URL }}" ] || [ -z "${{ secrets.IMAGE_NAME }}" ]; then
+            echo "REGISTRY_URL and IMAGE_NAME must be set!"
+            exit 1
+          fi
+          echo "REGISTRY_URL: ${{ secrets.REGISTRY_URL }}"
+          echo "IMAGE_NAME: ${{ secrets.IMAGE_NAME }}"
 
       - name: Build and Push
         uses: docker/build-push-action@v4
