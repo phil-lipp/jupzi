@@ -129,70 +129,54 @@ jobs:
           echo "Original resolv.conf backed up to /etc/resolv.conf.bak"
           
           # Configure DNS
-          echo "Configuring DNS with server: [MASKED]"
-          cat > /etc/resolv.conf << EOF
-          nameserver ${{ secrets.DNS_SERVER }}
-          options timeout:2 attempts:3 rotate
-          EOF
+          echo "nameserver ${{ secrets.DNS_SERVER }}" > /etc/resolv.conf
+          echo "options timeout:2 attempts:3 rotate" >> /etc/resolv.conf
           
-          # Verify DNS configuration (masked)
           echo "=== Current DNS Configuration ==="
-          sed 's/nameserver .*/nameserver [MASKED]/' /etc/resolv.conf
+          cat /etc/resolv.conf
           
           echo "=== Testing DNS Resolution ==="
           echo "Testing registry host resolution:"
           echo "Using host command:"
-          host "${REGISTRY_HOST}" || exit 1
+          host "$REGISTRY_HOST"
           echo "Using dig command:"
-          dig +short "${REGISTRY_HOST}" || exit 1
+          dig "$REGISTRY_HOST"
           echo "Using nslookup command:"
-          nslookup "${REGISTRY_HOST}" || exit 1
+          nslookup "$REGISTRY_HOST"
           
           echo "Testing repository domain resolution:"
           REPO_HOST=$(echo "${{ secrets.REPO_URL }}" | sed -E 's|^https?://([^/]+).*|\1|')
-          host "${REPO_HOST}" || exit 1
-          dig +short "${REPO_HOST}" || exit 1
+          host "$REPO_HOST"
+          dig "$REPO_HOST"
           
-          # Add hosts entry (masked)
+          # Add hosts entry if needed
           echo "Adding hosts entry: [MASKED]"
-          echo "${{ secrets.DNS_SERVER }} ${REPO_HOST}" >> /etc/hosts
+          echo "${{ secrets.DNS_SERVER }} $REGISTRY_HOST" >> /etc/hosts
           echo "Added hosts entry (masked):"
-          sed 's/.*/[MASKED]/' /etc/hosts | tail -n 1
+          tail -n 1 /etc/hosts
           
-          # Test network connectivity
           echo "=== Testing Network Connectivity ==="
           echo "Testing ping to DNS server:"
-          ping -c 4 "${{ secrets.DNS_SERVER }}" || exit 1
+          ping -c 4 "${{ secrets.DNS_SERVER }}"
           
           echo "Testing ping to registry host:"
-          ping -c 4 "${REGISTRY_HOST}" || exit 1
-
-      - name: Configure Git Connection
-        run: |
-          set -euo pipefail  # Exit on any error
+          ping -c 4 "$REGISTRY_HOST"
           
-          # Configure Git to use the correct DNS
-          git config --global http.sslVerify false
-          git config --global --add safe.directory /workspace/Development/jupzi
-          
-          # Extract repository host
-          REPO_URL="${{ secrets.REPO_URL }}"
-          if [[ ! $REPO_URL =~ ^https?://[^/]+ ]]; then
-            echo "Error: Invalid REPO_URL format"
-            exit 1
-          fi
-          
-          # Test git connection
           echo "Testing git connection..."
           echo "Repository URL: [MASKED]"
-          git ls-remote "${REPO_URL}" || exit 1
+          git ls-remote "${{ secrets.REPO_URL }}" || true
+
+      - name: Configure Git Credentials
+        run: |
+          # Configure git to use the provided credentials
+          git config --global credential.helper store
+          echo "https://${{ secrets.REGISTRY_USERNAME }}:${{ secrets.REGISTRY_PASSWORD }}@git.phil-lipp.de" > ~/.git-credentials
+          chmod 600 ~/.git-credentials
 
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          persist-credentials: false
-          token: ${{ secrets.GITEA_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -203,8 +187,11 @@ jobs:
         with:
           images: ${{ secrets.REGISTRY_URL }}/${{ secrets.IMAGE_NAME }}
           tags: |
-            type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
 
       - name: Build and Push
         uses: docker/build-push-action@v4
@@ -221,14 +208,12 @@ jobs:
             BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
       - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            dist/*.zip
             dist/*.tar.gz
+            dist/*.zip
           generate_release_notes: true
           draft: false
-          prerelease: false
-        env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }} 
+          prerelease: false 

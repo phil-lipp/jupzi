@@ -60,7 +60,8 @@ alembic/
 *.db
 
 # Gitea Actions
-.gitea/
+.gitea/*
+!.gitea/workflows/
 .act/
 .actrc
 
@@ -98,3 +99,5 @@ yarn.lock
 # System Files
 .DS_Store
 Thumbs.db
+
+.commit
