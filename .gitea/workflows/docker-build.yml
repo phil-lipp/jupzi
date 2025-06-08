@@ -43,6 +43,16 @@ jobs:
             return 0
           }
           
+          # Function to validate URL format
+          validate_url() {
+            local url=$1
+            if [[ ! $url =~ ^https?://[^/]+ ]]; then
+              echo "Error: URL must start with http:// or https://"
+              return 1
+            fi
+            return 0
+          }
+          
           # Store secrets in variables for validation
           DNS_SERVER="${{ secrets.DNS_SERVER }}"
           REPO_URL="${{ secrets.REPO_URL }}"
@@ -56,6 +66,10 @@ jobs:
           validate_secret "REPO_URL" "$REPO_URL" "false" || exit 1
           validate_secret "REGISTRY_URL" "$REGISTRY_URL" "false" || exit 1
           validate_secret "IMAGE_NAME" "$IMAGE_NAME" "false" || exit 1
+          
+          # Validate URL formats
+          validate_url "$REPO_URL" || exit 1
+          validate_url "$REGISTRY_URL" || exit 1
           
           # Validate optional secrets
           validate_secret "REGISTRY_USERNAME" "$REGISTRY_USERNAME" "true"
@@ -84,36 +98,37 @@ jobs:
           # Install required tools
           apt-get update && apt-get install -y iputils-ping dnsutils curl
           
-          # Debug environment variables
+          # Debug environment variables (masked)
           echo "=== Environment Variables ==="
-          echo "REGISTRY_URL: '${{ secrets.REGISTRY_URL }}'"
-          echo "IMAGE_NAME: '${{ secrets.IMAGE_NAME }}'"
-          echo "DNS_SERVER: '${{ secrets.DNS_SERVER }}'"
-          echo "REPO_URL: '${{ secrets.REPO_URL }}'"
+          echo "REGISTRY_URL: [MASKED]"
+          echo "IMAGE_NAME: [MASKED]"
+          echo "DNS_SERVER: [MASKED]"
+          echo "REPO_URL: [MASKED]"
           
           # Extract registry host without protocol
           REGISTRY_URL="${{ secrets.REGISTRY_URL }}"
           if [[ $REGISTRY_URL =~ ^https?://([^/]+) ]]; then
             REGISTRY_HOST="${BASH_REMATCH[1]}"
           else
-            REGISTRY_HOST="$REGISTRY_URL"
+            echo "Error: Invalid REGISTRY_URL format"
+            exit 1
           fi
-          echo "Registry host: '$REGISTRY_HOST'"
+          echo "Registry host: [MASKED]"
           
           # Backup original resolv.conf
           cp /etc/resolv.conf /etc/resolv.conf.bak
           echo "Original resolv.conf backed up to /etc/resolv.conf.bak"
           
           # Configure DNS
-          echo "Configuring DNS with server: '${{ secrets.DNS_SERVER }}'"
+          echo "Configuring DNS with server: [MASKED]"
           cat > /etc/resolv.conf << EOF
           nameserver ${{ secrets.DNS_SERVER }}
           options timeout:2 attempts:3 rotate
           EOF
           
-          # Verify DNS configuration
+          # Verify DNS configuration (masked)
           echo "=== Current DNS Configuration ==="
-          cat /etc/resolv.conf
+          sed 's/nameserver .*/nameserver [MASKED]/' /etc/resolv.conf
           
           echo "=== Testing DNS Resolution ==="
           echo "Testing registry host resolution:"
@@ -125,14 +140,15 @@ jobs:
           nslookup "${REGISTRY_HOST}" || exit 1
           
           echo "Testing repository domain resolution:"
-          host "${{ secrets.REPO_URL }}" || exit 1
-          dig +short "${{ secrets.REPO_URL }}" || exit 1
+          REPO_HOST=$(echo "${{ secrets.REPO_URL }}" | sed -E 's|^https?://([^/]+).*|\1|')
+          host "${REPO_HOST}" || exit 1
+          dig +short "${REPO_HOST}" || exit 1
           
-          # Add hosts entry
-          echo "Adding hosts entry: '${{ secrets.DNS_SERVER }} ${{ secrets.REPO_URL }}'"
-          echo "${{ secrets.DNS_SERVER }} ${{ secrets.REPO_URL }}" >> /etc/hosts
-          echo "Added hosts entry:"
-          tail -n 1 /etc/hosts
+          # Add hosts entry (masked)
+          echo "Adding hosts entry: [MASKED]"
+          echo "${{ secrets.DNS_SERVER }} ${REPO_HOST}" >> /etc/hosts
+          echo "Added hosts entry (masked):"
+          sed 's/.*/[MASKED]/' /etc/hosts | tail -n 1
           
           # Test network connectivity
           echo "=== Testing Network Connectivity ==="
@@ -189,9 +205,17 @@ jobs:
           git config --global http.sslVerify false
           git config --global --add safe.directory /workspace/Development/jupzi
           
+          # Extract repository host
+          REPO_URL="${{ secrets.REPO_URL }}"
+          if [[ ! $REPO_URL =~ ^https?://[^/]+ ]]; then
+            echo "Error: Invalid REPO_URL format"
+            exit 1
+          fi
+          
           # Test git connection
           echo "Testing git connection..."
-          git ls-remote "https://${{ secrets.REPO_URL }}" || exit 1
+          echo "Repository URL: [MASKED]"
+          git ls-remote "${REPO_URL}" || exit 1
 
       - name: Checkout code
         uses: actions/checkout@v3
