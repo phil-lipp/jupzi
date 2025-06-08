@@ -167,7 +167,7 @@ jobs:
           echo "Testing ping to registry host:"
           ping -c 4 "${REGISTRY_HOST}" || exit 1
 
-      - name: Configure Git DNS
+      - name: Configure Git Connection
         run: |
           set -euo pipefail  # Exit on any error
           
@@ -180,17 +180,6 @@ jobs:
           if [[ ! $REPO_URL =~ ^https?://[^/]+ ]]; then
             echo "Error: Invalid REPO_URL format"
             exit 1
-          fi
-          
-          # Configure git credentials if username and password are provided
-          if [ -n "${{ secrets.REGISTRY_USERNAME }}" ] && [ -n "${{ secrets.REGISTRY_PASSWORD }}" ]; then
-            echo "Configuring git credentials..."
-            REPO_HOST=$(echo "$REPO_URL" | sed -E 's|^https?://([^/]+).*|\1|')
-            git config --global credential.helper store
-            echo "https://${{ secrets.REGISTRY_USERNAME }}:${{ secrets.REGISTRY_PASSWORD }}@${REPO_HOST}" > ~/.git-credentials
-            chmod 600 ~/.git-credentials
-          else
-            echo "Warning: Git credentials not configured"
           fi
           
           # Test git connection
