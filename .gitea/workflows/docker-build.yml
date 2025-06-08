@@ -7,12 +7,6 @@ on:
     tags:
       - 'v*'
 
-env:
-  REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
-  IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
-  DNS_SERVER: ${{ secrets.DNS_SERVER }}
-  REPO_URL: ${{ secrets.REPO_URL }}
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
@@ -24,19 +18,19 @@ jobs:
           
           # Debug environment variables
           echo "=== Environment Variables ==="
-          echo "REGISTRY_URL: ${REGISTRY_URL:-not set}"
-          echo "IMAGE_NAME: ${IMAGE_NAME:-not set}"
-          echo "DNS_SERVER: ${DNS_SERVER:-not set}"
-          echo "REPO_URL: ${REPO_URL:-not set}"
+          echo "REGISTRY_URL: ${{ secrets.REGISTRY_URL }}"
+          echo "IMAGE_NAME: ${{ secrets.IMAGE_NAME }}"
+          echo "DNS_SERVER: ${{ secrets.DNS_SERVER }}"
+          echo "REPO_URL: ${{ secrets.REPO_URL }}"
           
           # Validate registry URL format
-          if [[ -z "$REGISTRY_URL" ]]; then
+          if [[ -z "${{ secrets.REGISTRY_URL }}" ]]; then
             echo "Error: REGISTRY_URL is not set"
             exit 1
           fi
           
           # Remove protocol if present
-          REGISTRY_HOST=${REGISTRY_URL#*://}
+          REGISTRY_HOST=${{ secrets.REGISTRY_URL }}#*://}
           REGISTRY_HOST=${REGISTRY_HOST%%/*}
           echo "Registry host: $REGISTRY_HOST"
           
@@ -45,14 +39,14 @@ jobs:
           echo "Original resolv.conf backed up to /etc/resolv.conf.bak"
           
           # Configure DNS with validation
-          if [ -z "$DNS_SERVER" ]; then
+          if [ -z "${{ secrets.DNS_SERVER }}" ]; then
             echo "Error: DNS_SERVER is not set"
             exit 1
           fi
           
           # Configure DNS
           cat > /etc/resolv.conf << EOF
-          nameserver ${DNS_SERVER}
+          nameserver ${{ secrets.DNS_SERVER }}
           options timeout:2 attempts:3 rotate
           EOF
           
@@ -70,12 +64,12 @@ jobs:
           nslookup ${REGISTRY_HOST} || true
           
           echo "Testing repository domain resolution:"
-          host ${REPO_URL} || true
-          dig +short ${REPO_URL} || true
+          host ${{ secrets.REPO_URL }} || true
+          dig +short ${{ secrets.REPO_URL }} || true
           
           # Add hosts entry
-          if [ -n "$DNS_SERVER" ] && [ -n "$REPO_URL" ]; then
-            echo "${DNS_SERVER} ${REPO_URL}" >> /etc/hosts
+          if [ -n "${{ secrets.DNS_SERVER }}" ] && [ -n "${{ secrets.REPO_URL }}" ]; then
+            echo "${{ secrets.DNS_SERVER }} ${{ secrets.REPO_URL }}" >> /etc/hosts
             echo "Added hosts entry:"
             tail -n 1 /etc/hosts
           else
@@ -85,7 +79,7 @@ jobs:
           # Test network connectivity
           echo "=== Testing Network Connectivity ==="
           echo "Testing ping to DNS server:"
-          ping -c 4 ${DNS_SERVER} || true
+          ping -c 4 ${{ secrets.DNS_SERVER }} || true
           
           echo "Testing ping to registry host:"
           ping -c 4 ${REGISTRY_HOST} || true
@@ -95,7 +89,7 @@ jobs:
           echo "=== Testing Registry Connectivity ==="
           
           # Extract registry host without protocol
-          REGISTRY_HOST=${REGISTRY_URL#*://}
+          REGISTRY_HOST=${{ secrets.REGISTRY_URL }}#*://}
           REGISTRY_HOST=${REGISTRY_HOST%%/*}
           
           # Test HTTPS connectivity to registry
@@ -110,9 +104,9 @@ jobs:
           
           # Check if registry requires authentication
           echo "Testing registry authentication:"
-          if [ -n "$REGISTRY_USERNAME" ] && [ -n "$REGISTRY_PASSWORD" ]; then
+          if [ -n "${{ secrets.REGISTRY_USERNAME }}" ] && [ -n "${{ secrets.REGISTRY_PASSWORD }}" ]; then
             echo "Registry credentials are set"
-            curl -v --connect-timeout 10 -u ${REGISTRY_USERNAME}:${REGISTRY_PASSWORD} https://${REGISTRY_HOST}/v2/_catalog || true
+            curl -v --connect-timeout 10 -u ${{ secrets.REGISTRY_USERNAME }}:${{ secrets.REGISTRY_PASSWORD }} https://${REGISTRY_HOST}/v2/_catalog || true
           else
             echo "Warning: Registry credentials not set"
           fi
@@ -122,7 +116,7 @@ jobs:
           echo "Testing registry host resolution one final time:"
           dig +trace ${REGISTRY_HOST} || true
           echo "Testing with specific DNS server:"
-          dig @${DNS_SERVER} ${REGISTRY_HOST} || true
+          dig @${{ secrets.DNS_SERVER }} ${REGISTRY_HOST} || true
 
       - name: Configure Git DNS
         run: |
@@ -132,7 +126,7 @@ jobs:
           
           # Test git connection
           echo "Testing git connection..."
-          git ls-remote https://${REPO_URL} || true
+          git ls-remote https://${{ secrets.REPO_URL }} || true
 
       - name: Checkout code
         uses: actions/checkout@v3
@@ -147,7 +141,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}
+          images: ${{ secrets.REGISTRY_URL }}/${{ secrets.IMAGE_NAME }}
           tags: |
             type=ref,event=tag
             type=raw,value=latest,enable={{is_default_branch}}
@@ -159,8 +153,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+          cache-from: type=registry,ref=${{ secrets.REGISTRY_URL }}/${{ secrets.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ secrets.REGISTRY_URL }}/${{ secrets.IMAGE_NAME }}:buildcache,mode=max
           build-args: |
             NODE_ENV=production
             VERSION=${{ github.ref_name }}
