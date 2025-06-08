@@ -1,8 +1,8 @@
 import requests
 from datetime import timedelta
-from utils.logging_config import setup_logging, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
-from utils.templates import FOOTER_TEXT, WEEKLY_OVERVIEW_HEADER
-from utils.calendar_utils import get_calendar_client, get_local_time, format_event, get_event_sort_key
+from jupzi.app.utils.logging_config import setup_logging, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
+from jupzi.app.utils.templates import FOOTER_TEXT, WEEKLY_OVERVIEW_HEADER
+from jupzi.app.utils.calendar_utils import get_calendar_client, get_local_time, format_event, get_event_sort_key
 
 # Configure logging
 logger = setup_logging('wochenuebersicht.log')

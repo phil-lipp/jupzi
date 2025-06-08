@@ -1,3 +1,31 @@
+# Jupibar
+
+A calendar and meeting management system.
+
+## Project Structure
+
+```
+jupibar/
+├── app/                    # Main application package
+│   ├── api/               # API endpoints and routes
+│   ├── core/              # Core application logic
+│   ├── models/            # Database models
+│   ├── utils/             # Utility functions
+│   ├── alembic/           # Database migrations
+│   └── database/          # Database configuration
+├── config/                # Configuration files
+│   ├── .env-example      # Example environment variables
+│   └── alembic.ini       # Alembic configuration
+├── scripts/               # Utility scripts
+│   ├── weekly_overview.py
+│   ├── meeting_poll.py
+│   └── free_dates.py
+├── logs/                  # Application logs
+├── requirements.txt       # Python dependencies
+├── Dockerfile            # Docker configuration
+└── docker-compose.yml    # Docker Compose configuration
+```
+
 # Various Telegram Scripts
 This repository contains a collection of Telegram bots and scripts for managing group meetings and schedules:
 
@@ -45,6 +73,15 @@ Key features across the scripts:
 ### Option 2: Local Setup
 
 1. Clone this repository
+   ```bash
+   git clone https://github.com/phil-lipp/jupzi.git
+   ```
+
+   to update use:
+   ```bash
+   cd jupzi
+   git pull
+   ```
 2. Create a virtual environment and activate it:
    ```bash
    python -m venv venv

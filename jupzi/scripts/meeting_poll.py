@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 from telegram import Bot, Update
 from telegram.error import TelegramError, TimedOut
 from telegram.ext import Application, PollAnswerHandler, ContextTypes
-from utils.logging_config import setup_logging, TESTING_ENVIRONMENT, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
-from utils.templates import (
+from jupibar.app.utils.logging_config import setup_logging, TESTING_ENVIRONMENT, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
+from jupibar.app.utils.templates import (
     POLL_QUESTION,
     POLL_OPTIONS,
     REMINDER_MESSAGE,

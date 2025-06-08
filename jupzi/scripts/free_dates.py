@@ -1,8 +1,8 @@
 import requests
 from datetime import timedelta
-from utils.logging_config import setup_logging, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
-from utils.templates import WEEKDAY_TRANSLATIONS, FOOTER_TEXT, FREE_DAYS_HEADER
-from utils.calendar_utils import get_calendar_client, get_local_time
+from jupibar.app.utils.logging_config import setup_logging, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
+from jupibar.app.utils.templates import WEEKDAY_TRANSLATIONS, FOOTER_TEXT, FREE_DAYS_HEADER
+from jupibar.app.utils.calendar_utils import get_calendar_client, get_local_time
 
 # Configure logging
 logger = setup_logging('freie_tage.log')
