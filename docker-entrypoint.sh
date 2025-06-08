@@ -2,4 +2,4 @@
 set -e
 
 alembic upgrade head
-exec python app.py 
+exec python app.py

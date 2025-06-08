@@ -45,7 +45,6 @@ pgdata/
 alembic/
 
 # Gitea Actions
-.gitea/
 .act/
 .actrc
 
