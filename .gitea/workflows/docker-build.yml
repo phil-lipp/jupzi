@@ -20,24 +20,44 @@ jobs:
           # Install required tools
           apt-get update && apt-get install -y iputils-ping dnsutils
           
-          # Configure DNS
-          echo "nameserver ${{ secrets.DNS_SERVER }}" | sudo tee /etc/resolv.conf
-          echo "search ${{ secrets.DNS_SEARCH }}" | sudo tee -a /etc/resolv.conf
+          # Backup original resolv.conf
+          cp /etc/resolv.conf /etc/resolv.conf.bak
+          
+          # Configure DNS with fallback
+          cat > /etc/resolv.conf << EOF
+          nameserver ${{ secrets.DNS_SERVER }}
+          search ${{ secrets.DNS_SEARCH }}
+          options timeout:2 attempts:3 rotate
+          EOF
           
           # Verify DNS configuration
+          echo "Current DNS configuration:"
           cat /etc/resolv.conf
-          nslookup ${{ secrets.REPO_URL }} || true
-          dig ${{ secrets.REPO_URL }} || true
+          
+          echo "Testing DNS resolution:"
+          host ${{ secrets.REPO_URL }} || true
+          dig +short ${{ secrets.REPO_URL }} || true
+          
+          # Add hosts entry
+          echo "${{ secrets.DNS_SERVER }} ${{ secrets.REPO_URL }}" >> /etc/hosts
+          echo "Added hosts entry:"
+          tail -n 1 /etc/hosts
 
       - name: Configure Git DNS
         run: |
+          # Configure Git to use the correct DNS
           git config --global http.sslVerify false
           git config --global --add safe.directory /workspace/Development/jupzi
-          # Add hosts entry if needed
-          echo "${{ secrets.DNS_SERVER }} ${{ secrets.REPO_URL }}" | sudo tee -a /etc/hosts
+          
+          # Test git connection
+          echo "Testing git connection..."
+          git ls-remote https://${{ secrets.REPO_URL }} || true
 
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Load .env file
         uses: hashicorp/vault-action@v2
