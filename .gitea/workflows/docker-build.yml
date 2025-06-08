@@ -10,13 +10,23 @@ on:
 env:
   REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
   IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
-  DOCKER_BUILD_ARGS: ${{ secrets.DOCKER_BUILD_ARGS }}
-  RELEASE_FILES: ${{ secrets.RELEASE_FILES }}
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
+      - name: Configure DNS
+        run: |
+          echo "nameserver ${{ secrets.DNS_SERVER }}" | sudo tee /etc/resolv.conf
+          echo "search ${{ secrets.DNS_SEARCH }}" | sudo tee -a /etc/resolv.conf
+          cat /etc/resolv.conf
+          ping -c 1 ${{ secrets.REPO_URL }} || true
+
+      - name: Configure Git DNS
+        run: |
+          git config --global http.sslVerify false
+          git config --global --add safe.directory /workspace/Development/jupzi
+
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -58,13 +68,17 @@ jobs:
           cache-from: type=registry,ref=${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
           build-args: |
-            ${{ secrets.DOCKER_BUILD_ARGS }}
+            NODE_ENV=production
+            VERSION=${{ github.ref_name }}
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ secrets.RELEASE_FILES }}
+          files: |
+            dist/*.zip
+            dist/*.tar.gz
           generate_release_notes: true
           draft: false
           prerelease: false
