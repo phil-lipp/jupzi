@@ -7,45 +7,65 @@ on:
     tags:
       - 'v*'
 
+# Add permissions block to ensure access to secrets
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    # Add environment to ensure secrets are available
+    environment:
+      name: production
+      url: ${{ secrets.REGISTRY_URL }}
     steps:
-      - name: Debug Secrets
+      - name: Validate Secrets
         run: |
-          echo "=== Raw Secret Values ==="
-          echo "DNS_SERVER value length: ${#DNS_SERVER}"
-          echo "DNS_SERVER value: '${DNS_SERVER}'"
-          echo "REPO_URL value length: ${#REPO_URL}"
-          echo "REPO_URL value: '${REPO_URL}'"
-          echo "REGISTRY_URL value length: ${#REGISTRY_URL}"
-          echo "REGISTRY_URL value: '${REGISTRY_URL}'"
-          echo "IMAGE_NAME value length: ${#IMAGE_NAME}"
-          echo "IMAGE_NAME value: '${IMAGE_NAME}'"
+          echo "=== Validating Required Secrets ==="
           
-          # Check if secrets are set
-          if [ -z "${{ secrets.DNS_SERVER }}" ]; then
-            echo "Error: DNS_SERVER secret is not set or empty"
-            exit 1
-          fi
+          # Function to validate secret
+          validate_secret() {
+            local secret_name=$1
+            local secret_value=$2
+            local is_optional=$3
+            
+            if [ -z "$secret_value" ]; then
+              if [ "$is_optional" = "true" ]; then
+                echo "Warning: Optional secret $secret_name is not set"
+                return 0
+              else
+                echo "Error: Required secret $secret_name is not set or empty"
+                return 1
+              fi
+            fi
+            return 0
+          }
           
-          if [ -z "${{ secrets.REPO_URL }}" ]; then
-            echo "Error: REPO_URL secret is not set or empty"
-            exit 1
-          fi
+          # Validate required secrets
+          validate_secret "DNS_SERVER" "${{ secrets.DNS_SERVER }}" "false" || exit 1
+          validate_secret "REPO_URL" "${{ secrets.REPO_URL }}" "false" || exit 1
+          validate_secret "REGISTRY_URL" "${{ secrets.REGISTRY_URL }}" "false" || exit 1
+          validate_secret "IMAGE_NAME" "${{ secrets.IMAGE_NAME }}" "false" || exit 1
           
-          if [ -z "${{ secrets.REGISTRY_URL }}" ]; then
-            echo "Error: REGISTRY_URL secret is not set or empty"
-            exit 1
-          fi
+          # Validate optional secrets
+          validate_secret "REGISTRY_USERNAME" "${{ secrets.REGISTRY_USERNAME }}" "true"
+          validate_secret "REGISTRY_PASSWORD" "${{ secrets.REGISTRY_PASSWORD }}" "true"
           
-          if [ -z "${{ secrets.IMAGE_NAME }}" ]; then
-            echo "Error: IMAGE_NAME secret is not set or empty"
-            exit 1
-          fi
+          echo "=== Secret Values (lengths only) ==="
+          echo "DNS_SERVER length: ${#DNS_SERVER}"
+          echo "REPO_URL length: ${#REPO_URL}"
+          echo "REGISTRY_URL length: ${#REGISTRY_URL}"
+          echo "IMAGE_NAME length: ${#IMAGE_NAME}"
+          echo "REGISTRY_USERNAME length: ${#REGISTRY_USERNAME}"
+          echo "REGISTRY_PASSWORD length: ${#REGISTRY_PASSWORD}"
+          
+          echo "All required secrets are present"
 
       - name: Configure DNS
         run: |
+          set -euo pipefail  # Exit on any error
+          
           # Install required tools
           apt-get update && apt-get install -y iputils-ping dnsutils curl
           
@@ -55,12 +75,6 @@ jobs:
           echo "IMAGE_NAME: '${{ secrets.IMAGE_NAME }}'"
           echo "DNS_SERVER: '${{ secrets.DNS_SERVER }}'"
           echo "REPO_URL: '${{ secrets.REPO_URL }}'"
-          
-          # Validate registry URL format
-          if [[ -z "${{ secrets.REGISTRY_URL }}" ]]; then
-            echo "Error: REGISTRY_URL is not set"
-            exit 1
-          fi
           
           # Extract registry host without protocol
           REGISTRY_URL="${{ secrets.REGISTRY_URL }}"
@@ -74,12 +88,6 @@ jobs:
           # Backup original resolv.conf
           cp /etc/resolv.conf /etc/resolv.conf.bak
           echo "Original resolv.conf backed up to /etc/resolv.conf.bak"
-          
-          # Configure DNS with validation
-          if [ -z "${{ secrets.DNS_SERVER }}" ]; then
-            echo "Error: DNS_SERVER is not set"
-            exit 1
-          fi
           
           # Configure DNS
           echo "Configuring DNS with server: '${{ secrets.DNS_SERVER }}'"
@@ -95,36 +103,34 @@ jobs:
           echo "=== Testing DNS Resolution ==="
           echo "Testing registry host resolution:"
           echo "Using host command:"
-          host "${REGISTRY_HOST}" || true
+          host "${REGISTRY_HOST}" || exit 1
           echo "Using dig command:"
-          dig +short "${REGISTRY_HOST}" || true
+          dig +short "${REGISTRY_HOST}" || exit 1
           echo "Using nslookup command:"
-          nslookup "${REGISTRY_HOST}" || true
+          nslookup "${REGISTRY_HOST}" || exit 1
           
           echo "Testing repository domain resolution:"
-          host "${{ secrets.REPO_URL }}" || true
-          dig +short "${{ secrets.REPO_URL }}" || true
+          host "${{ secrets.REPO_URL }}" || exit 1
+          dig +short "${{ secrets.REPO_URL }}" || exit 1
           
           # Add hosts entry
-          if [ -n "${{ secrets.DNS_SERVER }}" ] && [ -n "${{ secrets.REPO_URL }}" ]; then
-            echo "Adding hosts entry: '${{ secrets.DNS_SERVER }} ${{ secrets.REPO_URL }}'"
-            echo "${{ secrets.DNS_SERVER }} ${{ secrets.REPO_URL }}" >> /etc/hosts
-            echo "Added hosts entry:"
-            tail -n 1 /etc/hosts
-          else
-            echo "Warning: Could not add hosts entry - missing DNS_SERVER or REPO_URL"
-          fi
+          echo "Adding hosts entry: '${{ secrets.DNS_SERVER }} ${{ secrets.REPO_URL }}'"
+          echo "${{ secrets.DNS_SERVER }} ${{ secrets.REPO_URL }}" >> /etc/hosts
+          echo "Added hosts entry:"
+          tail -n 1 /etc/hosts
           
           # Test network connectivity
           echo "=== Testing Network Connectivity ==="
           echo "Testing ping to DNS server:"
-          ping -c 4 "${{ secrets.DNS_SERVER }}" || true
+          ping -c 4 "${{ secrets.DNS_SERVER }}" || exit 1
           
           echo "Testing ping to registry host:"
-          ping -c 4 "${REGISTRY_HOST}" || true
+          ping -c 4 "${REGISTRY_HOST}" || exit 1
 
       - name: Verify Registry Connectivity
         run: |
+          set -euo pipefail  # Exit on any error
+          
           echo "=== Testing Registry Connectivity ==="
           
           # Extract registry host without protocol
@@ -138,18 +144,17 @@ jobs:
           # Test HTTPS connectivity to registry
           echo "Testing HTTPS connection to registry:"
           echo "Attempting connection to: https://${REGISTRY_HOST}/v2/"
-          curl -v --connect-timeout 10 "https://${REGISTRY_HOST}/v2/" || true
+          curl -f --connect-timeout 10 "https://${REGISTRY_HOST}/v2/" || exit 1
           
           # Test Docker registry API
           echo "Testing Docker registry API:"
           echo "Attempting connection to: https://${REGISTRY_HOST}/v2/_catalog"
-          curl -v --connect-timeout 10 "https://${REGISTRY_HOST}/v2/_catalog" || true
+          curl -f --connect-timeout 10 "https://${REGISTRY_HOST}/v2/_catalog" || exit 1
           
           # Check if registry requires authentication
-          echo "Testing registry authentication:"
           if [ -n "${{ secrets.REGISTRY_USERNAME }}" ] && [ -n "${{ secrets.REGISTRY_PASSWORD }}" ]; then
-            echo "Registry credentials are set"
-            curl -v --connect-timeout 10 -u "${{ secrets.REGISTRY_USERNAME }}:${{ secrets.REGISTRY_PASSWORD }}" "https://${REGISTRY_HOST}/v2/_catalog" || true
+            echo "Testing registry authentication:"
+            curl -f --connect-timeout 10 -u "${{ secrets.REGISTRY_USERNAME }}:${{ secrets.REGISTRY_PASSWORD }}" "https://${REGISTRY_HOST}/v2/_catalog" || exit 1
           else
             echo "Warning: Registry credentials not set"
           fi
@@ -157,19 +162,21 @@ jobs:
           # Test DNS resolution of registry host
           echo "=== Final DNS Resolution Test ==="
           echo "Testing registry host resolution one final time:"
-          dig +trace "${REGISTRY_HOST}" || true
+          dig +trace "${REGISTRY_HOST}" || exit 1
           echo "Testing with specific DNS server:"
-          dig @"${{ secrets.DNS_SERVER }}" "${REGISTRY_HOST}" || true
+          dig @"${{ secrets.DNS_SERVER }}" "${REGISTRY_HOST}" || exit 1
 
       - name: Configure Git DNS
         run: |
+          set -euo pipefail  # Exit on any error
+          
           # Configure Git to use the correct DNS
           git config --global http.sslVerify false
           git config --global --add safe.directory /workspace/Development/jupzi
           
           # Test git connection
           echo "Testing git connection..."
-          git ls-remote "https://${{ secrets.REPO_URL }}" || true
+          git ls-remote "https://${{ secrets.REPO_URL }}" || exit 1
 
       - name: Checkout code
         uses: actions/checkout@v3
