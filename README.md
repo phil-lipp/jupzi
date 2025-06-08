@@ -12,6 +12,8 @@ The scripts use:
 - Environment variables for configuration
 - Customizable message templates
 - Support for testing and production environments
+- PostgreSQL database for state management and job orchestration
+- Docker for containerization
 
 Key features across the scripts:
 - Robust error handling and logging
@@ -19,8 +21,28 @@ Key features across the scripts:
 - Configurable timing intervals
 - Localization support
 - Clean separation of configuration and logic
+- State persistence and recovery
+- Job orchestration and scheduling
 
 ## Setup
+
+### Option 1: Docker Setup (Recommended)
+
+1. Clone this repository
+2. Copy `.env-example` to `.env` and fill in your values:
+   ```bash
+   cp .env-example .env
+   ```
+3. Set up your environment variables in `.env`:
+   - `TELEGRAM_BOT_TOKEN`: Your Telegram bot token from [@BotFather](https://t.me/botfather)
+   - `TELEGRAM_CHAT_ID`: The chat ID where the bot will send polls
+   - Database configuration (already set in .env-example)
+4. Start the application:
+   ```bash
+   docker-compose up --build
+   ```
+
+### Option 2: Local Setup
 
 1. Clone this repository
 2. Create a virtual environment and activate it:
@@ -63,6 +85,10 @@ Key features across the scripts:
 
 ### Run the bot:
 ```bash
+# With Docker
+docker-compose up
+
+# Without Docker
 python meeting_poll.py
 ```
 
@@ -70,10 +96,14 @@ The bot will:
 1. Send a weekly poll asking about attendance for the next Monday
 2. Send a reminder if not enough people have voted
 3. Close the poll after 48 hours
-
+4. Store poll state in the database for recovery if interrupted
 
 ### Run the weekly overview query:
 ```bash
+# With Docker
+docker-compose up
+
+# Without Docker
 python weekly_overview.py
 ```
 
@@ -90,10 +120,14 @@ The script will:
   🪩  smokefree
 ```
 5. Send the message via the Telegram Bot to the Telegram Channel/Chat
-
+6. Store the query results in the database
 
 ### Run the free dates query: 
 ```bash
+# With Docker
+docker-compose up
+
+# Without Docker
 python free_dates.py
 ```
 
@@ -103,7 +137,7 @@ The script will:
 3. Filter out any days that have an event, which __starts__ on that day.
 4. List all remaining days.
 5. Send the messsage via the Telegram Bot to the Telegram Channel/Chat
-
+6. Store the query results in the database
 
 ## Dependencies
 
@@ -112,3 +146,24 @@ The script will:
 - caldav>=1.0.0
 - requests>=2.31.0
 - pytz>=2024.1
+- sqlalchemy>=2.0
+- psycopg2-binary>=2.9
+- alembic>=1.11
+- pytest>=7.0
+
+## Database
+
+The application uses PostgreSQL for:
+- Storing poll states and responses
+- Job orchestration and scheduling
+- Event history and metadata
+- State recovery after interruptions
+
+Database migrations are managed using Alembic. To run migrations:
+```bash
+# With Docker
+docker-compose exec app alembic upgrade head
+
+# Without Docker
+alembic upgrade head
+```

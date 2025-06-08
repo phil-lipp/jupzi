@@ -35,3 +35,19 @@ htmlcov/
 .coverage.*
 coverage.xml
 *.cover
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Database
+pgdata/
+alembic/
+
+# Gitea Actions
+.gitea/
+.act/
+.actrc
+
+# Cursor
+.cursor/
