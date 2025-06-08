@@ -30,7 +30,8 @@ jobs:
             local secret_value=$2
             local is_optional=$3
             
-            if [ -z "$secret_value" ]; then
+            # Check if secret is empty or only whitespace
+            if [ -z "${secret_value:-}" ]; then
               if [ "$is_optional" = "true" ]; then
                 echo "Warning: Optional secret $secret_name is not set"
                 return 0
@@ -42,15 +43,23 @@ jobs:
             return 0
           }
           
+          # Store secrets in variables for validation
+          DNS_SERVER="${{ secrets.DNS_SERVER }}"
+          REPO_URL="${{ secrets.REPO_URL }}"
+          REGISTRY_URL="${{ secrets.REGISTRY_URL }}"
+          IMAGE_NAME="${{ secrets.IMAGE_NAME }}"
+          REGISTRY_USERNAME="${{ secrets.REGISTRY_USERNAME }}"
+          REGISTRY_PASSWORD="${{ secrets.REGISTRY_PASSWORD }}"
+          
           # Validate required secrets
-          validate_secret "DNS_SERVER" "${{ secrets.DNS_SERVER }}" "false" || exit 1
-          validate_secret "REPO_URL" "${{ secrets.REPO_URL }}" "false" || exit 1
-          validate_secret "REGISTRY_URL" "${{ secrets.REGISTRY_URL }}" "false" || exit 1
-          validate_secret "IMAGE_NAME" "${{ secrets.IMAGE_NAME }}" "false" || exit 1
+          validate_secret "DNS_SERVER" "$DNS_SERVER" "false" || exit 1
+          validate_secret "REPO_URL" "$REPO_URL" "false" || exit 1
+          validate_secret "REGISTRY_URL" "$REGISTRY_URL" "false" || exit 1
+          validate_secret "IMAGE_NAME" "$IMAGE_NAME" "false" || exit 1
           
           # Validate optional secrets
-          validate_secret "REGISTRY_USERNAME" "${{ secrets.REGISTRY_USERNAME }}" "true"
-          validate_secret "REGISTRY_PASSWORD" "${{ secrets.REGISTRY_PASSWORD }}" "true"
+          validate_secret "REGISTRY_USERNAME" "$REGISTRY_USERNAME" "true"
+          validate_secret "REGISTRY_PASSWORD" "$REGISTRY_PASSWORD" "true"
           
           echo "=== Secret Values (lengths only) ==="
           echo "DNS_SERVER length: ${#DNS_SERVER}"
@@ -60,7 +69,13 @@ jobs:
           echo "REGISTRY_USERNAME length: ${#REGISTRY_USERNAME}"
           echo "REGISTRY_PASSWORD length: ${#REGISTRY_PASSWORD}"
           
-          echo "All required secrets are present"
+          # Only print success if all required secrets are present
+          if [ -n "$DNS_SERVER" ] && [ -n "$REPO_URL" ] && [ -n "$REGISTRY_URL" ] && [ -n "$IMAGE_NAME" ]; then
+            echo "All required secrets are present"
+          else
+            echo "Error: One or more required secrets are missing"
+            exit 1
+          fi
 
       - name: Configure DNS
         run: |
