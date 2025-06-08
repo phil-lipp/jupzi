@@ -11,7 +11,6 @@ env:
   REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
   IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
   DNS_SERVER: ${{ secrets.DNS_SERVER }}
-  DNS_SEARCH: ${{ secrets.DNS_SEARCH }}
   REPO_URL: ${{ secrets.REPO_URL }}
 
 jobs:
@@ -26,7 +25,6 @@ jobs:
           # Debug environment variables
           echo "Checking environment variables:"
           echo "DNS_SERVER: ${DNS_SERVER:-not set}"
-          echo "DNS_SEARCH: ${DNS_SEARCH:-not set}"
           echo "REPO_URL: ${REPO_URL:-not set}"
           
           # Backup original resolv.conf
@@ -38,15 +36,9 @@ jobs:
             exit 1
           fi
           
-          if [ -z "$DNS_SEARCH" ]; then
-            echo "Error: DNS_SEARCH is not set"
-            exit 1
-          fi
-          
           # Configure DNS
           cat > /etc/resolv.conf << EOF
           nameserver ${DNS_SERVER}
-          search ${DNS_SEARCH}
           options timeout:2 attempts:3 rotate
           EOF
           
