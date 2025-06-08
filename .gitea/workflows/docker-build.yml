@@ -20,15 +20,18 @@ jobs:
       - name: Configure DNS
         run: |
           # Install required tools
-          apt-get update && apt-get install -y iputils-ping dnsutils
+          apt-get update && apt-get install -y iputils-ping dnsutils curl
           
           # Debug environment variables
-          echo "Checking environment variables:"
+          echo "=== Environment Variables ==="
+          echo "REGISTRY_URL: ${REGISTRY_URL:-not set}"
+          echo "IMAGE_NAME: ${IMAGE_NAME:-not set}"
           echo "DNS_SERVER: ${DNS_SERVER:-not set}"
           echo "REPO_URL: ${REPO_URL:-not set}"
           
           # Backup original resolv.conf
           cp /etc/resolv.conf /etc/resolv.conf.bak
+          echo "Original resolv.conf backed up to /etc/resolv.conf.bak"
           
           # Configure DNS with validation
           if [ -z "$DNS_SERVER" ]; then
@@ -43,10 +46,15 @@ jobs:
           EOF
           
           # Verify DNS configuration
-          echo "Current DNS configuration:"
+          echo "=== Current DNS Configuration ==="
           cat /etc/resolv.conf
           
-          echo "Testing DNS resolution:"
+          echo "=== Testing DNS Resolution ==="
+          echo "Testing registry domain resolution:"
+          host ${REGISTRY_URL} || true
+          dig +short ${REGISTRY_URL} || true
+          
+          echo "Testing repository domain resolution:"
           host ${REPO_URL} || true
           dig +short ${REPO_URL} || true
           
@@ -57,6 +65,35 @@ jobs:
             tail -n 1 /etc/hosts
           else
             echo "Warning: Could not add hosts entry - missing DNS_SERVER or REPO_URL"
+          fi
+          
+          # Test network connectivity
+          echo "=== Testing Network Connectivity ==="
+          echo "Testing ping to DNS server:"
+          ping -c 4 ${DNS_SERVER} || true
+          
+          echo "Testing ping to registry:"
+          ping -c 4 ${REGISTRY_URL} || true
+
+      - name: Verify Registry Connectivity
+        run: |
+          echo "=== Testing Registry Connectivity ==="
+          
+          # Test HTTPS connectivity to registry
+          echo "Testing HTTPS connection to registry:"
+          curl -v https://${REGISTRY_URL}/v2/ || true
+          
+          # Test Docker registry API
+          echo "Testing Docker registry API:"
+          curl -v https://${REGISTRY_URL}/v2/_catalog || true
+          
+          # Check if registry requires authentication
+          echo "Testing registry authentication:"
+          if [ -n "$REGISTRY_USERNAME" ] && [ -n "$REGISTRY_PASSWORD" ]; then
+            echo "Registry credentials are set"
+            curl -v -u ${REGISTRY_USERNAME}:${REGISTRY_PASSWORD} https://${REGISTRY_URL}/v2/_catalog || true
+          else
+            echo "Warning: Registry credentials not set"
           fi
 
       - name: Configure Git DNS
