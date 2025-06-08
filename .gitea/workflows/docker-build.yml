@@ -17,15 +17,24 @@ jobs:
     steps:
       - name: Configure DNS
         run: |
+          # Install required tools
+          apt-get update && apt-get install -y iputils-ping dnsutils
+          
+          # Configure DNS
           echo "nameserver ${{ secrets.DNS_SERVER }}" | sudo tee /etc/resolv.conf
           echo "search ${{ secrets.DNS_SEARCH }}" | sudo tee -a /etc/resolv.conf
+          
+          # Verify DNS configuration
           cat /etc/resolv.conf
-          ping -c 1 ${{ secrets.REPO_URL }} || true
+          nslookup ${{ secrets.REPO_URL }} || true
+          dig ${{ secrets.REPO_URL }} || true
 
       - name: Configure Git DNS
         run: |
           git config --global http.sslVerify false
           git config --global --add safe.directory /workspace/Development/jupzi
+          # Add hosts entry if needed
+          echo "${{ secrets.DNS_SERVER }} ${{ secrets.REPO_URL }}" | sudo tee -a /etc/hosts
 
       - name: Checkout code
         uses: actions/checkout@v3
