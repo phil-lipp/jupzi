@@ -1,228 +1,127 @@
-name: Build and Push Docker Image
+name: Build and Push
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - 'v*'
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
 
-# Add permissions block to ensure access to secrets
-permissions:
-  contents: read
-  packages: write
+env:
+  REGISTRY_HOST: ${{ secrets.REGISTRY_URL }}
+  IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
-    # Add environment to ensure secrets are available
-    environment:
-      name: production
-      url: ${{ secrets.REGISTRY_URL }}
+    permissions:
+      contents: write
+      packages: write
+
     steps:
-      - name: Validate Secrets
-        run: |
-          echo "=== Validating Required Secrets ==="
-          
-          # Function to validate secret
-          validate_secret() {
-            local secret_name=$1
-            local secret_value=$2
-            local is_optional=$3
-            
-            # Check if secret is empty or only whitespace
-            if [ -z "${secret_value:-}" ]; then
-              if [ "$is_optional" = "true" ]; then
-                echo "Warning: Optional secret $secret_name is not set"
-                return 0
-              else
-                echo "Error: Required secret $secret_name is not set or empty"
-                return 1
-              fi
-            fi
-            return 0
-          }
-          
-          # Function to validate URL format
-          validate_url() {
-            local url=$1
-            local url_name=$2
-            echo "Validating $url_name URL format..."
-            echo "URL value (first 10 chars): ${url:0:10}..."
-            if [[ ! $url =~ ^https?://[^/]+ ]]; then
-              echo "Error: $url_name URL must start with http:// or https://"
-              echo "Current value: $url"
-              return 1
-            fi
-            echo "$url_name URL format is valid"
-            return 0
-          }
-          
-          # Store secrets in variables for validation
-          DNS_SERVER="${{ secrets.DNS_SERVER }}"
-          REPO_URL="${{ secrets.REPO_URL }}"
-          REGISTRY_URL="${{ secrets.REGISTRY_URL }}"
-          IMAGE_NAME="${{ secrets.IMAGE_NAME }}"
-          REGISTRY_USERNAME="${{ secrets.REGISTRY_USERNAME }}"
-          REGISTRY_PASSWORD="${{ secrets.REGISTRY_PASSWORD }}"
-          
-          echo "=== Checking Secret Values ==="
-          echo "REPO_URL first 10 chars: ${REPO_URL:0:10}..."
-          echo "REGISTRY_URL first 10 chars: ${REGISTRY_URL:0:10}..."
-          
-          # Validate required secrets
-          validate_secret "DNS_SERVER" "$DNS_SERVER" "false" || exit 1
-          validate_secret "REPO_URL" "$REPO_URL" "false" || exit 1
-          validate_secret "REGISTRY_URL" "$REGISTRY_URL" "false" || exit 1
-          validate_secret "IMAGE_NAME" "$IMAGE_NAME" "false" || exit 1
-          
-          # Validate URL formats
-          validate_url "$REPO_URL" "Repository" || exit 1
-          validate_url "$REGISTRY_URL" "Registry" || exit 1
-          
-          # Validate optional secrets
-          validate_secret "REGISTRY_USERNAME" "$REGISTRY_USERNAME" "true"
-          validate_secret "REGISTRY_PASSWORD" "$REGISTRY_PASSWORD" "true"
-          
-          echo "=== Secret Values (lengths only) ==="
-          echo "DNS_SERVER length: ${#DNS_SERVER}"
-          echo "REPO_URL length: ${#REPO_URL}"
-          echo "REGISTRY_URL length: ${#REGISTRY_URL}"
-          echo "IMAGE_NAME length: ${#IMAGE_NAME}"
-          echo "REGISTRY_USERNAME length: ${#REGISTRY_USERNAME}"
-          echo "REGISTRY_PASSWORD length: ${#REGISTRY_PASSWORD}"
-          
-          # Only print success if all required secrets are present
-          if [ -n "$DNS_SERVER" ] && [ -n "$REPO_URL" ] && [ -n "$REGISTRY_URL" ] && [ -n "$IMAGE_NAME" ]; then
-            echo "All required secrets are present"
-          else
-            echo "Error: One or more required secrets are missing"
-            exit 1
-          fi
-
-      - name: Configure DNS
-        run: |
-          set -euo pipefail  # Exit on any error
-          
-          # Install required tools
-          apt-get update && apt-get install -y iputils-ping dnsutils curl
-          
-          # Debug environment variables (masked)
-          echo "=== Environment Variables ==="
-          echo "REGISTRY_URL: [MASKED]"
-          echo "IMAGE_NAME: [MASKED]"
-          echo "DNS_SERVER: [MASKED]"
-          echo "REPO_URL: [MASKED]"
-          
-          # Extract registry host without protocol
-          REGISTRY_URL="${{ secrets.REGISTRY_URL }}"
-          if [[ $REGISTRY_URL =~ ^https?://([^/]+) ]]; then
-            REGISTRY_HOST="${BASH_REMATCH[1]}"
-          else
-            echo "Error: Invalid REGISTRY_URL format"
-            exit 1
-          fi
-          echo "Registry host: [MASKED]"
-          
-          # Backup original resolv.conf
-          cp /etc/resolv.conf /etc/resolv.conf.bak
-          echo "Original resolv.conf backed up to /etc/resolv.conf.bak"
-          
-          # Configure DNS
-          echo "nameserver ${{ secrets.DNS_SERVER }}" > /etc/resolv.conf
-          echo "options timeout:2 attempts:3 rotate" >> /etc/resolv.conf
-          
-          echo "=== Current DNS Configuration ==="
-          cat /etc/resolv.conf
-          
-          echo "=== Testing DNS Resolution ==="
-          echo "Testing registry host resolution:"
-          echo "Using host command: host "$REGISTRY_HOST""
-          host "$REGISTRY_HOST"
-          echo "Using dig command: dig "$REGISTRY_HOST""
-          dig "$REGISTRY_HOST"
-          echo "Using nslookup command:"
-          nslookup "$REGISTRY_HOST"
-          
-          echo "Testing repository domain resolution:"
-          REPO_HOST=$(echo "${{ secrets.REPO_URL }}" | sed -E 's|^https?://([^/]+).*|\1|')
-          host "$REPO_HOST"
-          dig "$REPO_HOST"
-          
-          # Add hosts entry if needed
-          echo "Adding hosts entry: [MASKED]"
-          echo "${{ secrets.DNS_SERVER }} $REGISTRY_HOST" >> /etc/hosts
-          echo "Added hosts entry (masked):"
-          tail -n 1 /etc/hosts
-          
-          echo "=== Testing Network Connectivity ==="
-          echo "Testing ping to DNS server:"
-          ping -c 4 "${{ secrets.DNS_SERVER }}"
-          
-          echo "Testing ping to registry host:"
-          ping -c 4 "$REGISTRY_HOST"
-          
-          echo "Testing git connection..."
-          echo "Repository URL: [MASKED]"
-          git ls-remote "${{ secrets.REPO_URL }}" || true
-
-      - name: Configure Git Credentials
-        run: |
-          # Configure git to use the provided credentials
-          git config --global credential.helper store
-          echo "https://${{ secrets.REGISTRY_USERNAME }}:${{ secrets.REGISTRY_PASSWORD }}@git.phil-lipp.de" > ~/.git-credentials
-          chmod 600 ~/.git-credentials
-
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ secrets.REGISTRY_URL }}/${{ secrets.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,format=short
+      - name: Get current date
+        id: date
+        run: echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
 
-      - name: Validate Docker image variables
+      - name: Validate Secrets
         run: |
-          if [ -z "${{ secrets.REGISTRY_URL }}" ] || [ -z "${{ secrets.IMAGE_NAME }}" ]; then
-            echo "REGISTRY_URL and IMAGE_NAME must be set!"
+          echo "Validating required secrets..."
+          if [ -z "${{ secrets.DNS_SERVER }}" ]; then
+            echo "DNS_SERVER is not set"
             exit 1
           fi
-          echo "REGISTRY_URL: ${{ secrets.REGISTRY_URL }}"
-          echo "IMAGE_NAME: ${{ secrets.IMAGE_NAME }}"
+          if [ -z "${{ secrets.REPO_URL }}" ]; then
+            echo "REPO_URL is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.REGISTRY_URL }}" ]; then
+            echo "REGISTRY_URL is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.IMAGE_NAME }}" ]; then
+            echo "IMAGE_NAME is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.REGISTRY_USERNAME }}" ]; then
+            echo "REGISTRY_USERNAME is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.REGISTRY_PASSWORD }}" ]; then
+            echo "REGISTRY_PASSWORD is not set"
+            exit 1
+          fi
+          echo "All required secrets are present"
+
+      - name: Configure DNS
+        run: |
+          echo "Configuring DNS..."
+          echo "nameserver ${{ secrets.DNS_SERVER }}" | sudo tee /etc/resolv.conf > /dev/null
+          echo "DNS configured to use ${{ secrets.DNS_SERVER }}"
+
+      - name: Test Network Connectivity
+        run: |
+          echo "Testing network connectivity..."
+          echo "Testing registry host resolution:"
+          echo "Using host command: host $REGISTRY_HOST"
+          host "$REGISTRY_HOST"
+          echo "Using dig command: dig $REGISTRY_HOST"
+          dig "$REGISTRY_HOST"
+          echo "Using nslookup command:"
+          nslookup "$REGISTRY_HOST"
+
+      - name: Configure Git Credentials
+        run: |
+          echo "Configuring git credentials..."
+          git config --global credential.helper store
+          echo "https://${{ secrets.REGISTRY_USERNAME }}:${{ secrets.REGISTRY_PASSWORD }}@$REGISTRY_HOST" > ~/.git-credentials
+          chmod 600 ~/.git-credentials
+
+      - name: Login to Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.REGISTRY_URL }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: Build and Push
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ secrets.REGISTRY_URL }}/${{ secrets.IMAGE_NAME }}:main
+            ${{ secrets.REGISTRY_URL }}/${{ secrets.IMAGE_NAME }}:sha-${{ github.sha }}
           cache-from: type=registry,ref=${{ secrets.REGISTRY_URL }}/${{ secrets.IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ secrets.REGISTRY_URL }}/${{ secrets.IMAGE_NAME }}:buildcache,mode=max
           build-args: |
             NODE_ENV=production
             VERSION=${{ github.ref_name }}
-            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            BUILD_DATE=${{ steps.date.outputs.date }}
+          labels: |
+            org.opencontainers.image.created=${{ steps.date.outputs.date }}
+            org.opencontainers.image.description=
+            org.opencontainers.image.licenses=
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.title=${{ secrets.IMAGE_NAME }}
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ github.ref_name }}
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist/*.tar.gz
             dist/*.zip
+            dist/*.tar.gz
           generate_release_notes: true
-          draft: false
-          prerelease: false 
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
