@@ -46,10 +46,15 @@ jobs:
           # Function to validate URL format
           validate_url() {
             local url=$1
+            local url_name=$2
+            echo "Validating $url_name URL format..."
+            echo "URL value (first 10 chars): ${url:0:10}..."
             if [[ ! $url =~ ^https?://[^/]+ ]]; then
-              echo "Error: URL must start with http:// or https://"
+              echo "Error: $url_name URL must start with http:// or https://"
+              echo "Current value: $url"
               return 1
             fi
+            echo "$url_name URL format is valid"
             return 0
           }
           
@@ -61,6 +66,10 @@ jobs:
           REGISTRY_USERNAME="${{ secrets.REGISTRY_USERNAME }}"
           REGISTRY_PASSWORD="${{ secrets.REGISTRY_PASSWORD }}"
           
+          echo "=== Checking Secret Values ==="
+          echo "REPO_URL first 10 chars: ${REPO_URL:0:10}..."
+          echo "REGISTRY_URL first 10 chars: ${REGISTRY_URL:0:10}..."
+          
           # Validate required secrets
           validate_secret "DNS_SERVER" "$DNS_SERVER" "false" || exit 1
           validate_secret "REPO_URL" "$REPO_URL" "false" || exit 1
@@ -68,8 +77,8 @@ jobs:
           validate_secret "IMAGE_NAME" "$IMAGE_NAME" "false" || exit 1
           
           # Validate URL formats
-          validate_url "$REPO_URL" || exit 1
-          validate_url "$REGISTRY_URL" || exit 1
+          validate_url "$REPO_URL" "Repository" || exit 1
+          validate_url "$REGISTRY_URL" "Registry" || exit 1
           
           # Validate optional secrets
           validate_secret "REGISTRY_USERNAME" "$REGISTRY_USERNAME" "true"
