@@ -29,6 +29,17 @@ jobs:
           echo "DNS_SERVER: ${DNS_SERVER:-not set}"
           echo "REPO_URL: ${REPO_URL:-not set}"
           
+          # Validate registry URL format
+          if [[ -z "$REGISTRY_URL" ]]; then
+            echo "Error: REGISTRY_URL is not set"
+            exit 1
+          fi
+          
+          # Remove protocol if present
+          REGISTRY_HOST=${REGISTRY_URL#*://}
+          REGISTRY_HOST=${REGISTRY_HOST%%/*}
+          echo "Registry host: $REGISTRY_HOST"
+          
           # Backup original resolv.conf
           cp /etc/resolv.conf /etc/resolv.conf.bak
           echo "Original resolv.conf backed up to /etc/resolv.conf.bak"
@@ -50,9 +61,13 @@ jobs:
           cat /etc/resolv.conf
           
           echo "=== Testing DNS Resolution ==="
-          echo "Testing registry domain resolution:"
-          host ${REGISTRY_URL} || true
-          dig +short ${REGISTRY_URL} || true
+          echo "Testing registry host resolution:"
+          echo "Using host command:"
+          host ${REGISTRY_HOST} || true
+          echo "Using dig command:"
+          dig +short ${REGISTRY_HOST} || true
+          echo "Using nslookup command:"
+          nslookup ${REGISTRY_HOST} || true
           
           echo "Testing repository domain resolution:"
           host ${REPO_URL} || true
@@ -72,29 +87,42 @@ jobs:
           echo "Testing ping to DNS server:"
           ping -c 4 ${DNS_SERVER} || true
           
-          echo "Testing ping to registry:"
-          ping -c 4 ${REGISTRY_URL} || true
+          echo "Testing ping to registry host:"
+          ping -c 4 ${REGISTRY_HOST} || true
 
       - name: Verify Registry Connectivity
         run: |
           echo "=== Testing Registry Connectivity ==="
           
+          # Extract registry host without protocol
+          REGISTRY_HOST=${REGISTRY_URL#*://}
+          REGISTRY_HOST=${REGISTRY_HOST%%/*}
+          
           # Test HTTPS connectivity to registry
           echo "Testing HTTPS connection to registry:"
-          curl -v https://${REGISTRY_URL}/v2/ || true
+          echo "Attempting connection to: https://${REGISTRY_HOST}/v2/"
+          curl -v --connect-timeout 10 https://${REGISTRY_HOST}/v2/ || true
           
           # Test Docker registry API
           echo "Testing Docker registry API:"
-          curl -v https://${REGISTRY_URL}/v2/_catalog || true
+          echo "Attempting connection to: https://${REGISTRY_HOST}/v2/_catalog"
+          curl -v --connect-timeout 10 https://${REGISTRY_HOST}/v2/_catalog || true
           
           # Check if registry requires authentication
           echo "Testing registry authentication:"
           if [ -n "$REGISTRY_USERNAME" ] && [ -n "$REGISTRY_PASSWORD" ]; then
             echo "Registry credentials are set"
-            curl -v -u ${REGISTRY_USERNAME}:${REGISTRY_PASSWORD} https://${REGISTRY_URL}/v2/_catalog || true
+            curl -v --connect-timeout 10 -u ${REGISTRY_USERNAME}:${REGISTRY_PASSWORD} https://${REGISTRY_HOST}/v2/_catalog || true
           else
             echo "Warning: Registry credentials not set"
           fi
+          
+          # Test DNS resolution of registry host
+          echo "=== Final DNS Resolution Test ==="
+          echo "Testing registry host resolution one final time:"
+          dig +trace ${REGISTRY_HOST} || true
+          echo "Testing with specific DNS server:"
+          dig @${DNS_SERVER} ${REGISTRY_HOST} || true
 
       - name: Configure Git DNS
         run: |
