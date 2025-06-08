@@ -5,7 +5,7 @@ A calendar and meeting management system.
 ## Project Structure
 
 ```
-jupibar/
+jupzi/
 ├── app/                    # Main application package
 │   ├── api/               # API endpoints and routes
 │   ├── core/              # Core application logic
