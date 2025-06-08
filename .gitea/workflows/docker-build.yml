@@ -10,6 +10,9 @@ on:
 env:
   REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
   IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
+  DNS_SERVER: ${{ secrets.DNS_SERVER }}
+  DNS_SEARCH: ${{ secrets.DNS_SEARCH }}
+  REPO_URL: ${{ secrets.REPO_URL }}
 
 jobs:
   build-and-push:
@@ -20,13 +23,30 @@ jobs:
           # Install required tools
           apt-get update && apt-get install -y iputils-ping dnsutils
           
+          # Debug environment variables
+          echo "Checking environment variables:"
+          echo "DNS_SERVER: ${DNS_SERVER:-not set}"
+          echo "DNS_SEARCH: ${DNS_SEARCH:-not set}"
+          echo "REPO_URL: ${REPO_URL:-not set}"
+          
           # Backup original resolv.conf
           cp /etc/resolv.conf /etc/resolv.conf.bak
           
-          # Configure DNS with fallback
+          # Configure DNS with validation
+          if [ -z "$DNS_SERVER" ]; then
+            echo "Error: DNS_SERVER is not set"
+            exit 1
+          fi
+          
+          if [ -z "$DNS_SEARCH" ]; then
+            echo "Error: DNS_SEARCH is not set"
+            exit 1
+          fi
+          
+          # Configure DNS
           cat > /etc/resolv.conf << EOF
-          nameserver ${{ secrets.DNS_SERVER }}
-          search ${{ secrets.DNS_SEARCH }}
+          nameserver ${DNS_SERVER}
+          search ${DNS_SEARCH}
           options timeout:2 attempts:3 rotate
           EOF
           
@@ -35,13 +55,17 @@ jobs:
           cat /etc/resolv.conf
           
           echo "Testing DNS resolution:"
-          host ${{ secrets.REPO_URL }} || true
-          dig +short ${{ secrets.REPO_URL }} || true
+          host ${REPO_URL} || true
+          dig +short ${REPO_URL} || true
           
           # Add hosts entry
-          echo "${{ secrets.DNS_SERVER }} ${{ secrets.REPO_URL }}" >> /etc/hosts
-          echo "Added hosts entry:"
-          tail -n 1 /etc/hosts
+          if [ -n "$DNS_SERVER" ] && [ -n "$REPO_URL" ]; then
+            echo "${DNS_SERVER} ${REPO_URL}" >> /etc/hosts
+            echo "Added hosts entry:"
+            tail -n 1 /etc/hosts
+          else
+            echo "Warning: Could not add hosts entry - missing DNS_SERVER or REPO_URL"
+          fi
 
       - name: Configure Git DNS
         run: |
@@ -51,7 +75,7 @@ jobs:
           
           # Test git connection
           echo "Testing git connection..."
-          git ls-remote https://${{ secrets.REPO_URL }} || true
+          git ls-remote https://${REPO_URL} || true
 
       - name: Checkout code
         uses: actions/checkout@v3
