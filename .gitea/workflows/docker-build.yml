@@ -24,65 +24,66 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate and Log Secrets
+        run: |
+          echo "Validating and logging secrets..."
+          
+          # Check and log DNS_SERVER
+          if [ -z "${{ secrets.DNS_SERVER }}" ]; then
+            echo "❌ DNS_SERVER is not set"
+            exit 1
+          else
+            echo "✅ DNS_SERVER: ${{ secrets.DNS_SERVER }}"
+          fi
+          
+          # Check and log REPO_URL
+          if [ -z "${{ secrets.REPO_URL }}" ]; then
+            echo "❌ REPO_URL is not set"
+            exit 1
+          else
+            echo "✅ REPO_URL: ${{ secrets.REPO_URL }}"
+          fi
+          
+          # Check and log REGISTRY_URL
+          if [ -z "${{ secrets.REGISTRY_URL }}" ]; then
+            echo "❌ REGISTRY_URL is not set"
+            exit 1
+          else
+            echo "✅ REGISTRY_URL: ${{ secrets.REGISTRY_URL }}"
+          fi
+          
+          # Check and log IMAGE_NAME
+          if [ -z "${{ secrets.IMAGE_NAME }}" ]; then
+            echo "❌ IMAGE_NAME is not set"
+            exit 1
+          else
+            echo "✅ IMAGE_NAME: ${{ secrets.IMAGE_NAME }}"
+          fi
+          
+          # Check and log REGISTRY_USERNAME
+          if [ -z "${{ secrets.REGISTRY_USERNAME }}" ]; then
+            echo "❌ REGISTRY_USERNAME is not set"
+            exit 1
+          else
+            echo "✅ REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}"
+          fi
+          
+          # Check REGISTRY_PASSWORD (don't log the value)
+          if [ -z "${{ secrets.REGISTRY_PASSWORD }}" ]; then
+            echo "❌ REGISTRY_PASSWORD is not set"
+            exit 1
+          else
+            echo "✅ REGISTRY_PASSWORD: [REDACTED]"
+          fi
+          
+          echo "All required secrets are present and valid"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Get current date
         id: date
         run: echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
-
-      - name: Validate Secrets
-        run: |
-          echo "Validating required secrets..."
-          if [ -z "${{ secrets.DNS_SERVER }}" ]; then
-            echo "DNS_SERVER is not set"
-            exit 1
-          fi
-          if [ -z "${{ secrets.REPO_URL }}" ]; then
-            echo "REPO_URL is not set"
-            exit 1
-          fi
-          if [ -z "${{ secrets.REGISTRY_URL }}" ]; then
-            echo "REGISTRY_URL is not set"
-            exit 1
-          fi
-          if [ -z "${{ secrets.IMAGE_NAME }}" ]; then
-            echo "IMAGE_NAME is not set"
-            exit 1
-          fi
-          if [ -z "${{ secrets.REGISTRY_USERNAME }}" ]; then
-            echo "REGISTRY_USERNAME is not set"
-            exit 1
-          fi
-          if [ -z "${{ secrets.REGISTRY_PASSWORD }}" ]; then
-            echo "REGISTRY_PASSWORD is not set"
-            exit 1
-          fi
-          echo "All required secrets are present"
-
-      - name: Configure DNS
-        run: |
-          echo "Configuring DNS..."
-          echo "nameserver ${{ secrets.DNS_SERVER }}" | sudo tee /etc/resolv.conf > /dev/null
-          echo "DNS configured to use ${{ secrets.DNS_SERVER }}"
-
-      - name: Test Network Connectivity
-        run: |
-          echo "Testing network connectivity..."
-          echo "Testing registry host resolution:"
-          echo "Using host command: host $REGISTRY_HOST"
-          host "$REGISTRY_HOST"
-          echo "Using dig command: dig $REGISTRY_HOST"
-          dig "$REGISTRY_HOST"
-          echo "Using nslookup command:"
-          nslookup "$REGISTRY_HOST"
-
-      - name: Configure Git Credentials
-        run: |
-          echo "Configuring git credentials..."
-          git config --global credential.helper store
-          echo "https://${{ secrets.REGISTRY_USERNAME }}:${{ secrets.REGISTRY_PASSWORD }}@$REGISTRY_HOST" > ~/.git-credentials
-          chmod 600 ~/.git-credentials
 
       - name: Login to Registry
         uses: docker/login-action@v3
